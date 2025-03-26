@@ -1,3 +1,0 @@
-C:/Users/Tuna TASALI/Documents/Oxford/Year2/Labs/CO03plus/build/CMakeFiles/CO03plus.dir
-C:/Users/Tuna TASALI/Documents/Oxford/Year2/Labs/CO03plus/build/CMakeFiles/ALL_BUILD.dir
-C:/Users/Tuna TASALI/Documents/Oxford/Year2/Labs/CO03plus/build/CMakeFiles/ZERO_CHECK.dir
