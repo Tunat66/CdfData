@@ -1,4 +1,5 @@
 # CMake generation dependency list for this directory.
+C:/Program Files/CMake/share/cmake-3.26/Modules/CMakeCUDAInformation.cmake
 C:/Program Files/CMake/share/cmake-3.26/Modules/CMakeCXXInformation.cmake
 C:/Program Files/CMake/share/cmake-3.26/Modules/CMakeCommonLanguageInclude.cmake
 C:/Program Files/CMake/share/cmake-3.26/Modules/CMakeGenericSystem.cmake
@@ -10,11 +11,18 @@ C:/Program Files/CMake/share/cmake-3.26/Modules/CMakeSystemSpecificInitialize.cm
 C:/Program Files/CMake/share/cmake-3.26/Modules/Compiler/CMakeCommonCompilerMacros.cmake
 C:/Program Files/CMake/share/cmake-3.26/Modules/Compiler/MSVC-CXX.cmake
 C:/Program Files/CMake/share/cmake-3.26/Modules/Compiler/MSVC.cmake
+C:/Program Files/CMake/share/cmake-3.26/Modules/Compiler/NVIDIA-CUDA.cmake
+C:/Program Files/CMake/share/cmake-3.26/Modules/FindCUDA.cmake
+C:/Program Files/CMake/share/cmake-3.26/Modules/FindCUDA/select_compute_arch.cmake
+C:/Program Files/CMake/share/cmake-3.26/Modules/FindPackageHandleStandardArgs.cmake
+C:/Program Files/CMake/share/cmake-3.26/Modules/FindPackageMessage.cmake
 C:/Program Files/CMake/share/cmake-3.26/Modules/Platform/Windows-MSVC-CXX.cmake
 C:/Program Files/CMake/share/cmake-3.26/Modules/Platform/Windows-MSVC.cmake
+C:/Program Files/CMake/share/cmake-3.26/Modules/Platform/Windows-NVIDIA-CUDA.cmake
 C:/Program Files/CMake/share/cmake-3.26/Modules/Platform/Windows.cmake
 C:/Program Files/CMake/share/cmake-3.26/Modules/Platform/WindowsPaths.cmake
 C:/Users/Tuna TASALI/Documents/Oxford/Year2/Labs/CO03plus/CMakeLists.txt
+C:/Users/Tuna TASALI/Documents/Oxford/Year2/Labs/CO03plus/build/CMakeFiles/3.26.0-rc4/CMakeCUDACompiler.cmake
 C:/Users/Tuna TASALI/Documents/Oxford/Year2/Labs/CO03plus/build/CMakeFiles/3.26.0-rc4/CMakeCXXCompiler.cmake
 C:/Users/Tuna TASALI/Documents/Oxford/Year2/Labs/CO03plus/build/CMakeFiles/3.26.0-rc4/CMakeRCCompiler.cmake
 C:/Users/Tuna TASALI/Documents/Oxford/Year2/Labs/CO03plus/build/CMakeFiles/3.26.0-rc4/CMakeSystem.cmake

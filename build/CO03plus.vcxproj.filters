@@ -53,6 +53,11 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
+    <CudaCompile Include="..\src\CUDATrackKernel.cu">
+      <Filter>Source Files</Filter>
+    </CudaCompile>
+  </ItemGroup>
+  <ItemGroup>
     <CustomBuild Include="C:\Users\Tuna TASALI\Documents\Oxford\Year2\Labs\CO03plus\CMakeLists.txt" />
   </ItemGroup>
   <ItemGroup>

@@ -27,7 +27,7 @@ if __name__ == "__main__":
     # Plot the histogram
     plot_histogram(
         data=data,
-        bins=50,  # Number of bins
+        bins=100,  # Number of bins
         title="Mass Array Histogram",
         xlabel="Mass (GeV/c^2)",
         ylabel="Frequency",
