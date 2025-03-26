@@ -14,7 +14,7 @@ set(SOURCES
     src/main.cc
     src/DataFile.cc
     src/Track.cc
-    src/K0SAnalysis.cc
+    src/K0SAnalysis.cu
     src/Vertex.cc
     src/Event.cc
     src/Loop.cc
