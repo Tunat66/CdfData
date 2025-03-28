@@ -268,32 +268,41 @@ __device__ Cdf::plain_vertex track_compare(Cdf::plain_track track_s, Cdf::plain_
 __global__ void processTracksKernel(const double** trackData, int numTracks, double* primaryVertexArr, 
     double* massArray, double* lifetimeArray, int* massCounter, double m_pion) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if (idx >= numTracks) return; //if we have less tracks than the allocated threads, we just quit the function instantly
-    //printf("Thread %d processing track %d\n", idx, idx); //for debugging purposes
+    int idy = blockIdx.y * blockDim.y + threadIdx.y;
+    //number of pairs
+    //int numPairs = numTracks * (numTracks - 1) / 2; //not used in this kernel, but could be useful for debugging
+    //we are going to launch as many threads as the number of pairs
+    if (idx >= numTracks){
+        //printf("exiting thread %d\n", idx); //for debugging purposes
+        return;
+    } 
+    if (idy >= idx){ // equals case to prevent identical tracks from being compared
+        //printf("exiting thread %d\n", idy); //for debugging purposes
+        return;
+    }
+
     // Process the track
-    const double* track = trackData[idx];
-    //convert it to a plain_track struct
-    Cdf::plain_track track_s = {track[0], track[1], track[2], track[3], track[4]}; //subject track
+    const double* track1 = trackData[idx];
+    const double* track2 = trackData[idy];
+    //convert them to a plain_track structs
+    Cdf::plain_track track1_p = {track1[0], track1[1], track1[2], track1[3], track1[4]}; //subject track
+    Cdf::plain_track track2_p = {track2[0], track2[1], track2[2], track2[3], track2[4]}; //other track
     //convert the primaryVertex to a std::array
     double primaryVertex[2] = {primaryVertexArr[0], primaryVertexArr[1]};
     
-    //now loop over other tracks and compare them to the subject track
-    for (int i = 0; i < numTracks; ++i) {
-        Cdf::plain_track track_o = {trackData[i][0], trackData[i][1], trackData[i][2], trackData[i][3], trackData[i][4]}; 
+    //compare the two tracks
+    Cdf::plain_vertex vertex = track_compare(track1_p, track2_p, primaryVertex);
+    if (!vertex.isValid) { return; }
 
-        Cdf::plain_vertex vertex = track_compare(track_s, track_o, primaryVertex);
-        if (!vertex.isValid) { continue; }
-        //if we have a valid track, we can now calculate the mass and lifetime
-        double mass_kaon = Cdf::mass(m_pion, m_pion, track_s, track_o, vertex); 
-        double lifetime_kaon = Cdf::lifetime(m_pion, track_s, track_o, vertex, primaryVertex); 
+    //if we have a valid track, we can now calculate the mass and lifetime
+    double mass_kaon = Cdf::mass(m_pion, m_pion, track1_p, track2_p, vertex); 
+    double lifetime_kaon = Cdf::lifetime(m_pion, track1_p, track2_p, vertex, primaryVertex); 
+    // Write results to global memory
+    massArray[idx] = mass_kaon;
+    lifetimeArray[idx] = lifetime_kaon;
+    // Increment massCounter (atomic operation to avoid race conditions)
+    atomicAdd(massCounter, 1);
 
-        // Write results to global memory
-        massArray[idx] = mass_kaon;
-        lifetimeArray[idx] = lifetime_kaon;
-
-        // Increment massCounter (atomic operation to avoid race conditions)
-        atomicAdd(massCounter, 1);
-    }
 }
 
 

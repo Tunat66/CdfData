@@ -16,7 +16,7 @@ int main()
     auto analysis = std::make_shared<Cdf::K0SAnalysis>(pTcutoff, TrackImpactParametercutoff, Lxycutoff, ImpactParametercutoff);
 
     //create a Loop object
-    Cdf::Loop loop("cdf.dat", 1000, 100);
+    Cdf::Loop loop("cdf.dat", 10000, 100);
     loop.run({analysis});
 
 

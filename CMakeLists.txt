@@ -31,7 +31,7 @@ set(HEADERS
     include/CUDATrackKernel.cuh
 )
 
-# set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -G -O0")
+#set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -G -O0")
 
 # Include directories
 include_directories(include)

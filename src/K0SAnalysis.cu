@@ -132,9 +132,10 @@ void K0SAnalysis::event(Event* ev) {
     int massCounter = 0;
     cudaMemcpy(d_massCounter, &massCounter, sizeof(int), cudaMemcpyHostToDevice);
     // Launch the kernel
-    int blockSize = 256;
-    int numBlocks = (numTracks + blockSize - 1) / blockSize;
-    processTracksKernel<<<numBlocks, blockSize>>>(d_trackData, numTracks, d_primaryVertex, d_massArray, d_lifetimeArray, d_massCounter, m_pion);
+    dim3 blockSize(16, 16);  // 16x16 threads per block
+    dim3 gridSize((numTracks + blockSize.x - 1) / blockSize.x,
+              (numTracks + blockSize.y - 1) / blockSize.y);
+    processTracksKernel<<<gridSize, blockSize>>>(d_trackData, numTracks, d_primaryVertex, d_massArray, d_lifetimeArray, d_massCounter, m_pion);
     // Check for kernel launch errors
     cudaGetLastError();
     // Synchronize the device to ensure the kernel has finished
