@@ -66,6 +66,10 @@
         "xutility": "cpp",
         "complex": "cpp",
         "array": "cpp",
-        "numeric": "cpp"
+        "numeric": "cpp",
+        "cstdarg": "cpp",
+        "functional": "cpp",
+        "unordered_map": "cpp",
+        "xhash": "cpp"
     }
 }

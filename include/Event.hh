@@ -10,6 +10,7 @@ namespace Cdf
             Event();
             bool isValid();
             std::vector<Track> getTracks() const {return tracks;}
+            std::array <double, 2> getVertex() const {return vertex;}
         //DataFile is friend class and can access
         friend class DataFile;
         friend class Vertex;

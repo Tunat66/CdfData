@@ -1,7 +1,13 @@
 #include "K0SAnalysis.hh"
-#include <iostream>
-#include <cmath>
-#include <fstream>
+#define CUDA_CHECK(call) \
+    do { \
+        cudaError_t err = call; \
+        if (err != cudaSuccess) { \
+            std::cerr << "CUDA error at " << __FILE__ << ":" << __LINE__ << " - " \
+                      << cudaGetErrorString(err) << std::endl; \
+            exit(EXIT_FAILURE); \
+        } \
+    } while (0)
 namespace Cdf 
 {
 // Constructor
@@ -9,7 +15,8 @@ K0SAnalysis::K0SAnalysis(double pTcutoff, double TrackImpactParametercutoff, dou
     : pTcutoff(pTcutoff),
       TrackImpactParametercutoff(TrackImpactParametercutoff),
       Lxycutoff(Lxycutoff),
-      ImpactParametercutoff(ImpactParametercutoff) {}
+      ImpactParametercutoff(ImpactParametercutoff) 
+{}
 
 // Start method
 void K0SAnalysis::start() {
@@ -61,78 +68,107 @@ void K0SAnalysis::event(Event* ev) {
     // Get the number of tracks
     auto tracks = ev->getTracks();
     int numTracks = tracks.size();
+    std::array<double, 2> primaryVertex = ev->getVertex();
+    double* cPrimaryVertex = new double[2];
+    cPrimaryVertex[0] = primaryVertex[0];
+    cPrimaryVertex[1] = primaryVertex[1];
+    //allocate memory on the GPU for the primary vertex
+    double* d_primaryVertex;
+    cudaMalloc(&d_primaryVertex, 2 * sizeof(double));
+    // Copy the primary vertex to the GPU
+    cudaMemcpy(d_primaryVertex, cPrimaryVertex, 2 * sizeof(double), cudaMemcpyHostToDevice);
+
+
+    // copy over the cutoff values to the GPU
+    // Set the cutoff values in constant memory
+    //CUDA_CHECK(cudaMemcpyToSymbol(pTcutoff, &this->pTcutoff, sizeof(double)));
+    //CUDA_CHECK(cudaMemcpyToSymbol(TrackImpactParametercutoff, &this->TrackImpactParametercutoff, sizeof(double)));
+    //CUDA_CHECK(cudaMemcpyToSymbol(Lxycutoff, &this->Lxycutoff, sizeof(double)));
+    //CUDA_CHECK(cudaMemcpyToSymbol(ImpactParametercutoff, &this->ImpactParametercutoff, sizeof(double)));
     
     // Allocate memory on the GPU
-    double* d_trackData;
     double* d_massArray;
     double* d_lifetimeArray;
     int* d_massCounter;
-
-    cudaMalloc(&d_trackData, numTracks * sizeof(double));
     cudaMalloc(&d_massArray, numTracks * sizeof(double));
     cudaMalloc(&d_lifetimeArray, numTracks * sizeof(double));
     cudaMalloc(&d_massCounter, sizeof(int));
-    
-    
-    for (const auto& track : ev->getTracks()) {
-        Helix helicalTrack(track);
 
-        // Get vertices that satisfy cutoff criteria
-        auto vertices = vertex_checkOverlaps(helicalTrack, ev);
-        if (vertices.empty()) {
-            continue;
-        }
-
-        // Iterate through vertices and calculate masses and lifetimes
-        for (const auto& vertex : vertices) {
-            massCounter++;
-            double mass_kaon = vertex->mass(m_pion, m_pion);
-            massArray.push_back(mass_kaon);
-
-            double lifetime_kaon = vertex->lifetime(mass_kaon);
-            lifetimeArray.push_back(lifetime_kaon);
-        }
+    // Copy track data to the GPU
+    std::vector<std::vector<double>> trackData(numTracks);
+    for (int i = 0; i < numTracks; ++i) {
+        trackData[i] = tracks[i].getTrackParameters(); // Replace with actual track parameter
     }
-}
+    //each track has 5 pieces of data, so we need to allocate 5 times the number of tracks
+    //see Track.hh for the pieces of the data (protected attributes)
 
-// Helper method to check overlaps
-std::vector<std::shared_ptr<Vertex>> K0SAnalysis::vertex_checkOverlaps(const Helix& helicalTrack, Event* ev) {
-    std::vector<std::shared_ptr<Vertex>> validVertices;
-
-    for (const auto& track : ev->getTracks()) {
-        Helix h(track);
-        auto vertex = std::make_shared<Vertex>(helicalTrack, h, ev);
-        auto dPVarr = vertex->dPV();
-
-        // Skip invalid vertices
-        if (vertex->isBroken()) {
-            //std::cout << "broken vertex" << std::endl;
-            //std::cout << "Broken Vertex Parameters: " << vertex->ImpactParameter() << " " << vertex->pT() << " " << dPVarr[0] << " " << dPVarr[1] << " " << vertex->Lxy() << std::endl;
-
-            continue;
-        }
-        //std::cout << "Vertex Parameters: " << vertex->ImpactParameter() << " " << vertex->pT() << " " << dPVarr[0] << " " << dPVarr[1] << " " << vertex->Lxy() << std::endl;
-
-
-        // Apply filtering criteria
-        if (std::abs(vertex->ImpactParameter()) > ImpactParametercutoff) {
-            continue;
-        }
-        if (std::abs(vertex->pT()) < pTcutoff) {
-            continue;
-        }
-        if (std::abs(dPVarr[0]) < TrackImpactParametercutoff || std::abs(dPVarr[1]) < TrackImpactParametercutoff) {
-            continue;
-        }
-        if (std::abs(vertex->Lxy()) < Lxycutoff) {
-            continue;
-        }
-        //std::cout << "Accepted Vertex Parameters: " << vertex->ImpactParameter() << " " << vertex->pT() << " " << dPVarr[0] << " " << dPVarr[1] << " " << vertex->Lxy() << std::endl;
-
-        // Add valid vertex
-        validVertices.push_back(vertex);
+    // Flatten the track data into a single array
+    std::vector<double> flattenedTrackData;
+    for (const auto& track : trackData) {
+        flattenedTrackData.insert(flattenedTrackData.end(), track.begin(), track.end());
     }
 
-    return validVertices;
+    // Allocate memory for the flattened data on the device
+    double* d_flattenedTrackData;
+    cudaMalloc(&d_flattenedTrackData, flattenedTrackData.size() * sizeof(double));
+    cudaMemcpy(d_flattenedTrackData, flattenedTrackData.data(), flattenedTrackData.size() * sizeof(double), cudaMemcpyHostToDevice);
+
+    // Allocate memory for the array of pointers on the device
+    const double** d_trackData;
+    cudaMalloc(&d_trackData, numTracks * sizeof(double*));
+
+    // Create an array of pointers on the host
+    std::vector<double*> h_trackData(numTracks);
+    size_t offset = 0;
+    for (int i = 0; i < numTracks; ++i) {
+        h_trackData[i] = d_flattenedTrackData + offset;
+        offset += trackData[i].size();
+    }
+
+    // Copy the array of pointers to the device
+    cudaMemcpy(d_trackData, h_trackData.data(), numTracks * sizeof(double*), cudaMemcpyHostToDevice);
+
+    // Initialize massCounter on the GPU
+    int massCounter = 0;
+    cudaMemcpy(d_massCounter, &massCounter, sizeof(int), cudaMemcpyHostToDevice);
+    // Launch the kernel
+    int blockSize = 256;
+    int numBlocks = (numTracks + blockSize - 1) / blockSize;
+    processTracksKernel<<<numBlocks, blockSize>>>(d_trackData, numTracks, d_primaryVertex, d_massArray, d_lifetimeArray, d_massCounter, m_pion);
+    // Check for kernel launch errors
+    cudaGetLastError();
+    // Synchronize the device to ensure the kernel has finished
+    cudaDeviceSynchronize();
+
+
+    // Copy results back to the host
+    std::vector<double> massArray(numTracks);
+    
+    std::vector<double> lifetimeArray(numTracks);
+    cudaMemcpy(massArray.data(), d_massArray, numTracks * sizeof(double), cudaMemcpyDeviceToHost);
+    cudaMemcpy(lifetimeArray.data(), d_lifetimeArray, numTracks * sizeof(double), cudaMemcpyDeviceToHost);
+    cudaMemcpy(&massCounter, d_massCounter, sizeof(int), cudaMemcpyDeviceToHost);
+
+    // Free GPU memory
+    cudaFree(d_trackData);
+    cudaFree(d_flattenedTrackData);
+    cudaFree(d_massArray);
+    cudaFree(d_lifetimeArray);
+    cudaFree(d_massCounter);
+    cudaFree(d_primaryVertex);
+
+    // Free CPU memory
+    delete[] cPrimaryVertex;
+    // No need to free d_trackData with delete[] as it was allocated using cudaMalloc.
+    // The cudaFree call above already handles the deallocation of d_trackData.
+
+    // Store results in the class members
+    this->massArray.insert(this->massArray.end(), massArray.begin(), massArray.end());
+    this->lifetimeArray.insert(this->lifetimeArray.end(), lifetimeArray.begin(), lifetimeArray.end());
+    //std::cout << "Mass counter: " << massCounter << std::endl;
+    this->massCounter += massCounter;
+
+    
 }
-}
+}  // namespace Cdf
+

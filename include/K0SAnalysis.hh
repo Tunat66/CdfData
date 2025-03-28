@@ -3,9 +3,11 @@
 #include <vector>
 #include <memory>
 #include "Analysis.hh"
-#include "Helix.hh"
-#include "Vertex.hh"
 #include "Event.hh"
+#include "CUDATrackKernel.cuh"
+#include <iostream>
+#include <cmath>
+#include <fstream>
 
 namespace Cdf
 {
@@ -44,7 +46,7 @@ namespace Cdf
         
         private:
             // Helper method to check overlaps
-            std::vector<std::shared_ptr<Vertex>> vertex_checkOverlaps(const Helix& helicalTrack, Event* ev);
+            //std::vector<std::shared_ptr<Vertex>> vertex_checkOverlaps(const Helix& helicalTrack, Event* ev);
         };    
 } // namespace Cdf
 

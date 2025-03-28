@@ -8,6 +8,10 @@ int main()
     double TrackImpactParametercutoff = 0.3;
     double Lxycutoff = 2;
     double ImpactParametercutoff = 0.1;
+    //to improve performance very slightly,
+    //consider hardcoding these values to the cuda kernel
+
+
     //create an instance of the K0SAnalysis class
     auto analysis = std::make_shared<Cdf::K0SAnalysis>(pTcutoff, TrackImpactParametercutoff, Lxycutoff, ImpactParametercutoff);
 

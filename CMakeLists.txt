@@ -14,11 +14,9 @@ set(SOURCES
     src/main.cc
     src/DataFile.cc
     src/Track.cc
-    src/K0SAnalysis.cu
-    src/Vertex.cc
     src/Event.cc
     src/Loop.cc
-    src/Helix.cc
+    src/K0SAnalysis.cu
     src/CUDATrackKernel.cu
 )
 
@@ -28,11 +26,12 @@ set(HEADERS
     include/Event.hh
     include/Track.hh
     include/K0SAnalysis.hh
-    include/Vertex.hh
     include/Analysis.hh
     include/Loop.hh
-    include/Helix.hh
+    include/CUDATrackKernel.cuh
 )
+
+# set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -G -O0")
 
 # Include directories
 include_directories(include)
@@ -43,12 +42,12 @@ include_directories(${CUDA_INCLUDE_DIRS})
 # Lib directories
 link_directories(${CUDA_LIBRARY_DIRS})
 
-
-# Copy the Python script to the build directory
-configure_file(${CMAKE_SOURCE_DIR}/scripts/plot_histogram.py ${CMAKE_BINARY_DIR}/plot_histogram.py COPYONLY)
-
 # Create the executable
 add_executable(CO03plus ${SOURCES} ${HEADERS})
 
-# Link the CUDA libraries
-target_link_libraries(CO03plus cudart)
+# Link the CUDA libraries, including the base library
+# and the .cu files which were compiled separately
+target_link_libraries(CO03plus cudart) #no helix functions directly called by CUDA kernel
+
+# Copy the Python script to the build directory
+configure_file(${CMAKE_SOURCE_DIR}/scripts/plot_histogram.py ${CMAKE_BINARY_DIR}/plot_histogram.py COPYONLY)

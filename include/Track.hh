@@ -12,6 +12,7 @@ namespace Cdf
             Track() = default;
             Track(std::vector<double> TrackParameters);
             bool isValid();
+            std::vector<double> getTrackParameters() const { return {cotTheta, curvature, d0, phi0, z0}; }
         protected:
             double cotTheta = -999.0;
             double curvature = -999.0;
