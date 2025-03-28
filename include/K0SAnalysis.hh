@@ -28,12 +28,26 @@ namespace Cdf
             // Constants
             const double GeV = 1e9;
             const double m_pion = 0.13957039; // GeV
-            int massCounter = 0;
+            //int massCounter = 0;
             const int nbins = 100;
             const double mmin = 0.4; // GeV
             const double mmax = 0.6; // GeV
             const double tmin = 10;  // ps
             const double tmax = 200; // ps
+            static constexpr int maxTracksPerEvent = 500; // Maximum number of tracks per event, adjust as needed
+            static constexpr int maxPairs = maxTracksPerEvent * (maxTracksPerEvent - 1) / 2;
+
+            // stuff to allocate on the gpu
+            double* d_massArray;
+            double* d_lifetimeArray;
+            int* d_massCounter;
+            double* d_primaryVertex;
+
+            double* d_flattenedTrackData;
+            double** d_trackData;
+
+            //stuff to allocate on the CPU
+            double* cPrimaryVertex;
         
         public:
             // Constructor

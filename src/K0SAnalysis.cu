@@ -16,15 +16,41 @@ K0SAnalysis::K0SAnalysis(double pTcutoff, double TrackImpactParametercutoff, dou
       TrackImpactParametercutoff(TrackImpactParametercutoff),
       Lxycutoff(Lxycutoff),
       ImpactParametercutoff(ImpactParametercutoff) 
-{}
+{
+    cPrimaryVertex = new double[2];
+}
 
 // Start method
 void K0SAnalysis::start() {
     // Currently empty, can be filled if needed
+    // Allocate GPU memory once
+    cudaMalloc(&d_massArray, maxPairs * sizeof(double));
+    cudaMalloc(&d_lifetimeArray, maxPairs * sizeof(double));
+    
+    cudaMalloc(&d_massCounter, sizeof(int));
+    cudaMalloc(&d_primaryVertex, 2 * sizeof(double));
+
+    cudaMalloc(&d_flattenedTrackData, maxTracksPerEvent * 5 * sizeof(double));  // Assuming 5 parameters per track
+    cudaMalloc(&d_trackData, maxTracksPerEvent * sizeof(double*));
 }
 
 // Stop method
 void K0SAnalysis::stop() {
+
+    
+    
+    //free CPU memory
+    delete[] cPrimaryVertex;
+
+
+    // Free GPU memory
+    cudaFree(d_trackData);
+    cudaFree(d_flattenedTrackData);
+    cudaFree(d_massArray);
+    cudaFree(d_lifetimeArray);
+    cudaFree(d_massCounter);
+    cudaFree(d_primaryVertex);
+
     // Remove zeroes from the mass and lifetime arrays
     massArray.erase(std::remove(massArray.begin(), massArray.end(), 0), massArray.end());
     lifetimeArray.erase(std::remove(lifetimeArray.begin(), lifetimeArray.end(), 0), lifetimeArray.end());
@@ -61,6 +87,8 @@ void K0SAnalysis::stop() {
         std::cerr << "Error: Could not open lifetimeArray.dat for writing." << std::endl;
     }
 
+    
+
 }
 
 // Event method
@@ -69,12 +97,10 @@ void K0SAnalysis::event(Event* ev) {
     auto tracks = ev->getTracks();
     int numTracks = tracks.size();
     std::array<double, 2> primaryVertex = ev->getVertex();
-    double* cPrimaryVertex = new double[2];
+    
     cPrimaryVertex[0] = primaryVertex[0];
     cPrimaryVertex[1] = primaryVertex[1];
     //allocate memory on the GPU for the primary vertex
-    double* d_primaryVertex;
-    cudaMalloc(&d_primaryVertex, 2 * sizeof(double));
     // Copy the primary vertex to the GPU
     cudaMemcpy(d_primaryVertex, cPrimaryVertex, 2 * sizeof(double), cudaMemcpyHostToDevice);
 
@@ -86,15 +112,8 @@ void K0SAnalysis::event(Event* ev) {
     //CUDA_CHECK(cudaMemcpyToSymbol(Lxycutoff, &this->Lxycutoff, sizeof(double)));
     //CUDA_CHECK(cudaMemcpyToSymbol(ImpactParametercutoff, &this->ImpactParametercutoff, sizeof(double)));
     
-    // Allocate memory on the GPU
-    double* d_massArray;
-    double* d_lifetimeArray;
-    int* d_massCounter;
-    cudaMalloc(&d_massArray, numTracks * sizeof(double));
-    cudaMalloc(&d_lifetimeArray, numTracks * sizeof(double));
-    cudaMalloc(&d_massCounter, sizeof(int));
 
-    // Copy track data to the GPU
+    // Gather Track Data using the event object
     std::vector<std::vector<double>> trackData(numTracks);
     for (int i = 0; i < numTracks; ++i) {
         trackData[i] = tracks[i].getTrackParameters(); // Replace with actual track parameter
@@ -108,30 +127,29 @@ void K0SAnalysis::event(Event* ev) {
         flattenedTrackData.insert(flattenedTrackData.end(), track.begin(), track.end());
     }
 
+    // we will keep reusing the d_flattenedTrackData and d_trackData pointers
+    // no need to clear it as it will be overwritten and numTracks will be passed
+    // to the kernel to prevent it from reading junk data
+
     // Allocate memory for the flattened data on the device
-    double* d_flattenedTrackData;
-    cudaMalloc(&d_flattenedTrackData, flattenedTrackData.size() * sizeof(double));
     cudaMemcpy(d_flattenedTrackData, flattenedTrackData.data(), flattenedTrackData.size() * sizeof(double), cudaMemcpyHostToDevice);
-
-    // Allocate memory for the array of pointers on the device
-    const double** d_trackData;
-    cudaMalloc(&d_trackData, numTracks * sizeof(double*));
-
     // Create an array of pointers on the host
-    std::vector<double*> h_trackData(numTracks);
+    if (numTracks > maxTracksPerEvent) {
+        std::cerr << "Error K0SAnalysis: numTracks exceeds maxTracksPerEvent!" << std::endl;
+        exit(EXIT_FAILURE);
+    }
+    std::array<double*, maxTracksPerEvent> h_trackData; 
     size_t offset = 0;
     for (int i = 0; i < numTracks; ++i) {
-        h_trackData[i] = d_flattenedTrackData + offset;
+        h_trackData[i] = d_flattenedTrackData + offset; //doing address arithmetic
         offset += trackData[i].size();
     }
-
     // Copy the array of pointers to the device
     cudaMemcpy(d_trackData, h_trackData.data(), numTracks * sizeof(double*), cudaMemcpyHostToDevice);
 
-    // Initialize massCounter on the GPU
-    int massCounter = 0;
-    cudaMemcpy(d_massCounter, &massCounter, sizeof(int), cudaMemcpyHostToDevice);
     // Launch the kernel
+    cudaMemset(d_massCounter, 0, sizeof(int));
+    cudaMemset(d_massArray, -1, maxPairs * sizeof(double)); //set masses to invalid values
     dim3 blockSize(16, 16);  // 16x16 threads per block
     dim3 gridSize((numTracks + blockSize.x - 1) / blockSize.x,
               (numTracks + blockSize.y - 1) / blockSize.y);
@@ -141,35 +159,36 @@ void K0SAnalysis::event(Event* ev) {
     // Synchronize the device to ensure the kernel has finished
     cudaDeviceSynchronize();
 
-
-    // Copy results back to the host
-    std::vector<double> massArray(numTracks);
-    
-    std::vector<double> lifetimeArray(numTracks);
-    cudaMemcpy(massArray.data(), d_massArray, numTracks * sizeof(double), cudaMemcpyDeviceToHost);
-    cudaMemcpy(lifetimeArray.data(), d_lifetimeArray, numTracks * sizeof(double), cudaMemcpyDeviceToHost);
+    //now extract the data from d_massArray
+    // copy the amount of masses that were calculated
+    int massCounter = 0;
     cudaMemcpy(&massCounter, d_massCounter, sizeof(int), cudaMemcpyDeviceToHost);
-
-    // Free GPU memory
-    cudaFree(d_trackData);
-    cudaFree(d_flattenedTrackData);
-    cudaFree(d_massArray);
-    cudaFree(d_lifetimeArray);
-    cudaFree(d_massCounter);
-    cudaFree(d_primaryVertex);
-
-    // Free CPU memory
-    delete[] cPrimaryVertex;
-    // No need to free d_trackData with delete[] as it was allocated using cudaMalloc.
-    // The cudaFree call above already handles the deallocation of d_trackData.
-
-    // Store results in the class members
-    this->massArray.insert(this->massArray.end(), massArray.begin(), massArray.end());
-    this->lifetimeArray.insert(this->lifetimeArray.end(), lifetimeArray.begin(), lifetimeArray.end());
     //std::cout << "Mass counter: " << massCounter << std::endl;
-    this->massCounter += massCounter;
+    if (massCounter > maxPairs) {
+        std::cerr << "Error: massCounter exceeds allocated size of d_massArray!" << std::endl;
+        exit(EXIT_FAILURE);
+    }
+
+    // Append the values in d_massArray to the massArray
+    std::vector<double> tempMassArray(maxPairs);
+    std::vector<double> tempLifetimeArray(maxPairs);
 
     
+
+    cudaMemcpy(tempMassArray.data(), d_massArray, maxPairs * sizeof(double), cudaMemcpyDeviceToHost);
+    cudaMemcpy(tempLifetimeArray.data(), d_lifetimeArray, maxPairs * sizeof(double), cudaMemcpyDeviceToHost);
+
+    //clean tempMassArray and tempLifetimeArray of invalid values
+    tempMassArray.erase(std::remove_if(tempMassArray.begin(), tempMassArray.end(),
+                                       [](double value) { return value == -1 || std::isnan(value); }),
+                        tempMassArray.end());
+
+    //for (int i = 0; i < massCounter; ++i) {
+    //    std::cout << "Mass: " << tempMassArray[i] << std::endl;
+    //}
+    massArray.insert(massArray.end(), tempMassArray.begin(), tempMassArray.end());
+    lifetimeArray.insert(lifetimeArray.end(), tempLifetimeArray.begin(), tempLifetimeArray.end());
+
 }
 }  // namespace Cdf
 

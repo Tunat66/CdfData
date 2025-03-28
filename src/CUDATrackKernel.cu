@@ -265,7 +265,7 @@ __device__ Cdf::plain_vertex track_compare(Cdf::plain_track track_s, Cdf::plain_
     return vertex;
 }
 
-__global__ void processTracksKernel(const double** trackData, int numTracks, double* primaryVertexArr, 
+__global__ void processTracksKernel(double** trackData, int numTracks, double* primaryVertexArr, 
     double* massArray, double* lifetimeArray, int* massCounter, double m_pion) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     int idy = blockIdx.y * blockDim.y + threadIdx.y;
@@ -296,10 +296,13 @@ __global__ void processTracksKernel(const double** trackData, int numTracks, dou
 
     //if we have a valid track, we can now calculate the mass and lifetime
     double mass_kaon = Cdf::mass(m_pion, m_pion, track1_p, track2_p, vertex); 
-    double lifetime_kaon = Cdf::lifetime(m_pion, track1_p, track2_p, vertex, primaryVertex); 
+    double lifetime_kaon = Cdf::lifetime(m_pion, track1_p, track2_p, vertex, primaryVertex);
+    int uniqueIndex = idx * (idx - 1) / 2 + idy;
+
+    //printf("Thread (%d, %d): uniqueIndex = %d, mass = %f, lifetime = %f, massCounter = %d\n", idx, idy, uniqueIndex, mass_kaon, lifetime_kaon, *massCounter);
     // Write results to global memory
-    massArray[idx] = mass_kaon;
-    lifetimeArray[idx] = lifetime_kaon;
+    massArray[uniqueIndex] = mass_kaon;
+    lifetimeArray[uniqueIndex] = lifetime_kaon;
     // Increment massCounter (atomic operation to avoid race conditions)
     atomicAdd(massCounter, 1);
 

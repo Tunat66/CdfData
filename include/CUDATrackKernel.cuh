@@ -97,5 +97,5 @@ namespace Cdf
 }
 
 // Kernel decleration
-__global__ void processTracksKernel(const double** trackData, int numTracks, double* primaryVertex, double* massArray, double* lifetimeArray, int* massCounter, double m_pion);
+__global__ void processTracksKernel(double** trackData, int numTracks, double* primaryVertex, double* massArray, double* lifetimeArray, int* massCounter, double m_pion);
 __device__ Cdf::plain_vertex track_compare(Cdf::plain_track track_s, Cdf::plain_track track_o, double primaryVertex[2]);
